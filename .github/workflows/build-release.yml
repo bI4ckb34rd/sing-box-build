@@ -1,0 +1,56 @@
+name: Build and Release Sing-Box
+
+on:
+  workflow_dispatch:
+    inputs:
+      sing_version:
+        description: 'Sing-Box version (e.g., v1.11.3)'
+        required: true
+        default: 'latest'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Specific Sing-Box Version
+        run: |
+          VERSION="${{ github.event.inputs.sing_version }}"
+          if [[ "$VERSION" == "latest" ]]; then
+            VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
+          fi
+          git clone --depth 1 --branch "$VERSION" https://github.com/SagerNet/sing-box.git
+          echo "Building version $VERSION"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Dependencies
+        run: sudo apt update && sudo apt install -y build-essential
+
+      - name: Build Sing-Box
+        working-directory: sing-box
+        run: |
+          TAGS="with_quic with_grpc with_dhcp with_wireguard with_ech with_utls with_reality_server with_acme with_clash_api with_v2ray_api with_gvisor"
+          make || go build -tags "$TAGS" -o sing-box ./cmd/sing-box
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: "sing-box-${{ github.event.inputs.sing_version }}"
+          name: "Sing-Box Build ${{ github.event.inputs.sing_version }}"
+          body: "Automated build of Sing-Box version ${{ github.event.inputs.sing_version }}."
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Binary to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sing-box/sing-box
+          token: ${{ secrets.GITHUB_TOKEN }}
