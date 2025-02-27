@@ -25,16 +25,23 @@ jobs:
           ref: ${{ github.event.inputs.version }}
 
       # Step 2: Set up Go environment
+      - name: Determine Go version
+        id: go-version
+        run: |
+          if echo "${{ github.event.inputs.version }}" | grep -q 'v1.9'; then
+            echo "go_version=1.18.5" >> $GITHUB_ENV
+          elif echo "${{ github.event.inputs.version }}" | grep -q 'v1.10'; then
+            echo "go_version=1.20.0" >> $GITHUB_ENV
+          elif echo "${{ github.event.inputs.version }}" | grep -q 'v1.11'; then
+            echo "go_version=1.23.1" >> $GITHUB_ENV
+          else
+            echo "go_version=1.23.1" >> $GITHUB_ENV
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: |
-            ${{ 
-              contains(github.event.inputs.version, 'v1.9') ? '1.18.5' :
-              contains(github.event.inputs.version, 'v1.10') ? '1.20.0' :
-              contains(github.event.inputs.version, 'v1.11') ? '1.23.1' :
-              '1.23.1'
-            }}
+          go-version: ${{ env.go_version }}
 
       # Step 3: Define build tags
       - name: Define build tags
