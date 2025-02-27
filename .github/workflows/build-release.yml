@@ -21,7 +21,7 @@ jobs:
       - name: Checkout sing-box
         uses: actions/checkout@v3
         with:
-          repository: Sing-box/sing-box
+          repository: SagerNet/sing-box
           ref: ${{ github.event.inputs.version }}
 
       # Step 2: Set up Go environment
