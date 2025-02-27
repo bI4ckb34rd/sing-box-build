@@ -90,25 +90,19 @@ jobs:
         go build -tags ${{ env.TAG_ALL }}-v -o sing-box-windows-CGO-all.exe -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
         cd ..
 
-    - name: List built files
-      run: |
-        cd sing-box
-        ls -l sing-box-linux sing-box-linux-CGO sing-box-linux-all sing-box-linux-CGO-all sing-box-windows.exe sing-box-windows-CGO.exe sing-box-windows-all.exe sing-box-windows-CGO-all.exe
-        cd ..
-
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: sing-box
         path: |
-          sing-box-linux
-          sing-box-linux-CGO
-          sing-box-linux-all
-          sing-box-linux-CGO-all
-          sing-box-windows.exe
-          sing-box-windows-CGO.exe
-          sing-box-windows-all.exe
-          sing-box-windows-CGO-all.exe
+          ${{ github.workspace }}/sing-box/sing-box-linux
+          ${{ github.workspace }}/sing-box/sing-box-linux-CGO
+          ${{ github.workspace }}/sing-box/sing-box-linux-all
+          ${{ github.workspace }}/sing-box/sing-box-linux-CGO-all
+          ${{ github.workspace }}/sing-box/sing-box-windows.exe
+          ${{ github.workspace }}/sing-box/sing-box-windows-CGO.exe
+          ${{ github.workspace }}/sing-box/sing-box-windows-all.exe
+          ${{ github.workspace }}/sing-box/sing-box-windows-CGO-all.exe
 
     - name: Release
       uses: softprops/action-gh-release@v2
@@ -118,11 +112,11 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          sing-box-linux
-          sing-box-linux-CGO
-          sing-box-linux-all
-          sing-box-linux-CGO-all
-          sing-box-windows.exe
-          sing-box-windows-CGO.exe
-          sing-box-windows-all.exe
-          sing-box-windows-CGO-all.exe
+          ${{ github.workspace }}/sing-box/sing-box-linux
+          ${{ github.workspace }}/sing-box/sing-box-linux-CGO
+          ${{ github.workspace }}/sing-box/sing-box-linux-all
+          ${{ github.workspace }}/sing-box/sing-box-linux-CGO-all
+          ${{ github.workspace }}/sing-box/sing-box-windows.exe
+          ${{ github.workspace }}/sing-box/sing-box-windows-CGO.exe
+          ${{ github.workspace }}/sing-box/sing-box-windows-all.exe
+          ${{ github.workspace }}/sing-box/sing-box-windows-CGO-all.exe
