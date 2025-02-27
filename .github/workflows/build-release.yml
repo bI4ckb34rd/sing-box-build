@@ -1,5 +1,8 @@
 name: Build and Release sing-box
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
