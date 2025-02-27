@@ -90,20 +90,6 @@ jobs:
         go build -tags ${{ env.TAG_ALL }}-v -o sing-box-windows-CGO-all.exe -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
         cd ..
 
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: sing-box
-        path: |
-          ${{ github.workspace }}/sing-box/sing-box-linux
-          ${{ github.workspace }}/sing-box/sing-box-linux-CGO
-          ${{ github.workspace }}/sing-box/sing-box-linux-all
-          ${{ github.workspace }}/sing-box/sing-box-linux-CGO-all
-          ${{ github.workspace }}/sing-box/sing-box-windows.exe
-          ${{ github.workspace }}/sing-box/sing-box-windows-CGO.exe
-          ${{ github.workspace }}/sing-box/sing-box-windows-all.exe
-          ${{ github.workspace }}/sing-box/sing-box-windows-CGO-all.exe
-
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
