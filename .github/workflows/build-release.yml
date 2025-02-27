@@ -69,7 +69,7 @@ jobs:
 
       # Step 6: Upload artifact
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sing-box-${{ matrix.os }}-${{ matrix.tags }}
           path: sing-box-${{ matrix.os }}-${{ matrix.tags }}.*
@@ -80,9 +80,11 @@ jobs:
     steps:
       # Step 1: Download all artifacts
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: my-artifact-*
+          merge-multiple: true
 
       # Step 2: Create a release
       - name: Create Release
