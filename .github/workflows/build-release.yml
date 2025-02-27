@@ -1,52 +1,97 @@
-name: Build and Release Sing-Box
+name: Build and Release sing-box
 
 on:
   workflow_dispatch:
     inputs:
-      sing_version:
-        description: 'Sing-Box version (e.g., v1.11.3)'
+      version:
+        description: "sing-box version to build (e.g., v1.11.4)"
         required: true
-        default: 'latest'
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [windows, linux]
+        tags: ["default", "all"]
 
     steps:
-      - name: Checkout Specific Sing-Box Version
-        run: |
-          VERSION="${{ github.event.inputs.sing_version }}"
-          if [[ "$VERSION" == "latest" ]]; then
-            VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
-          fi
-          git clone --depth 1 --branch "$VERSION" https://github.com/SagerNet/sing-box.git
-          echo "Building version $VERSION"
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      # Step 1: Checkout the repository
+      - name: Checkout sing-box
+        uses: actions/checkout@v3
         with:
-          go-version: '1.21'
+          repository: Sing-box/sing-box
+          ref: ${{ github.event.inputs.version }}
 
-      - name: Install Dependencies
-        run: sudo apt update && sudo apt install -y build-essential
+      # Step 2: Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: |
+            ${{ 
+              contains(github.event.inputs.version, 'v1.9') ? '1.18.5' :
+              contains(github.event.inputs.version, 'v1.10') ? '1.20.0' :
+              contains(github.event.inputs.version, 'v1.11') ? '1.23.1' :
+              '1.23.1'
+            }}
 
-      - name: Build Sing-Box
-        working-directory: sing-box
+      # Step 3: Define build tags
+      - name: Define build tags
+        id: build-tags
         run: |
-          TAGS="with_quic with_grpc with_dhcp with_wireguard with_ech with_utls with_reality_server with_acme with_clash_api with_v2ray_api with_gvisor"
-          make || go build -tags "$TAGS" -o sing-box ./cmd/sing-box
+          if [ "${{ matrix.tags }}" == "default" ]; then
+            echo "tags=with_gvisor,with_reality_server,with_quic,with_utls,with_ech,with_dhcp,with_wireguard,with_acme,with_clash_api" >> $GITHUB_ENV
+          else
+            echo "tags=with_gvisor,with_reality_server,with_quic,with_utls,with_ech,with_dhcp,with_wireguard,with_acme,with_clash_api,with_v2ray_api,with_grpc" >> $GITHUB_ENV
+          fi
 
+      # Step 4: Build sing-box
+      - name: Build sing-box
+        run: |
+          GOOS=${{ matrix.os }} GOARCH=amd64 go build -tags "${{ env.tags }}" -o sing-box-${{ matrix.os }}-${{ matrix.tags }} ./cmd/sing-box
+
+      # Step 5: Archive the binary
+      - name: Archive binary
+        run: |
+          if [ "${{ matrix.os }}" == "windows" ]; then
+            zip sing-box-${{ matrix.os }}-${{ matrix.tags }}.zip sing-box-${{ matrix.os }}-${{ matrix.tags }}
+          else
+            tar -czf sing-box-${{ matrix.os }}-${{ matrix.tags }}.tar.gz sing-box-${{ matrix.os }}-${{ matrix.tags }}
+          fi
+
+      # Step 6: Upload artifact
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sing-box-${{ matrix.os }}-${{ matrix.tags }}
+          path: sing-box-${{ matrix.os }}-${{ matrix.tags }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Download all artifacts
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      # Step 2: Create a release
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: actions/create-release@v1
         with:
-          tag_name: "sing-box-${{ github.event.inputs.sing_version }}"
-          name: "Sing-Box Build ${{ github.event.inputs.sing_version }}"
-          body: "Automated build of Sing-Box version ${{ github.event.inputs.sing_version }}."
+          tag_name: ${{ github.event.inputs.version }}
+          release_name: Release ${{ github.event.inputs.version }}
           draft: false
           prerelease: false
 
-      - name: Upload Binary to Release
-        uses: softprops/action-gh-release@v2
+      # Step 3: Upload release assets
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
         with:
-          files: sing-box/sing-box
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/artifacts/sing-box-${{ matrix.os }}-${{ matrix.tags }}.*
+          asset_name: sing-box-${{ matrix.os }}-${{ matrix.tags }}.*
+          asset_content_type: application/octet-stream
