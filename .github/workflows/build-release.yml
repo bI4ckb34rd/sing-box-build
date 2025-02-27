@@ -3,118 +3,106 @@ name: Build and Release sing-box
 permissions:
   contents: write
 
+env:
+  LINUX: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1
+  LINUX_CGO: CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOAMD64=v1
+  WINDOWS: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GOAMD64=v1
+  WINDOWS_CGO: CGO_ENABLED=1 GOOS=windows GOARCH=amd64 GOAMD64=v1
+  TAG_DEFAULT: with_gvisor,with_reality_server,with_quic,with_utls,with_ech,with_dhcp,with_wireguard,with_acme,with_clash_api
+  TAG_ALL: with_gvisor,with_reality_server,with_quic,with_utls,with_ech,with_dhcp,with_wireguard,with_acme,with_clash_api,with_v2ray_api,with_grpc
+
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'sing-box version (e.g., v1.11.4)'
+      sing_version:
+        description: "sing-box version to build (e.g., v1.11.4)"
         required: true
-        type: string
+        default: 'latest'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [linux, windows]
-        tag-set: [default, all]
-        include:
-          - os: linux
-            output: sing-box
-            ext: ""
-          - os: windows
-            output: sing-box
-            ext: ".exe"
-          - tag-set: default
-            tags: "with_gvisor,with_reality_server,with_quic,with_utls,with_ech,with_dhcp,with_wireguard,with_acme,with_clash_api"
-          - tag-set: all
-            tags: "with_gvisor,with_reality_server,with_quic,with_utls,with_ech,with_dhcp,with_wireguard,with_acme,with_clash_api,with_v2ray_api,with_grpc"
 
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.23.1'
-          check-latest: true
-        
-      - name: Check out sing-box code
-        uses: actions/checkout@v4
-        with:
-          repository: 'SagerNet/sing-box'
-          ref: ${{ github.event.inputs.version }}
-          
-      - name: Parse version
-        id: parse-version
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          # Remove 'v' prefix if present
-          VERSION="${VERSION#v}"
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          
-          # Determine correct Go version based on sing-box version
-          if [[ "$MAJOR" -eq 1 && "$MINOR" -ge 11 ]]; then
-            echo "go_version=1.23.1" >> $GITHUB_OUTPUT
-          elif [[ "$MAJOR" -eq 1 && "$MINOR" -eq 10 ]]; then
-            echo "go_version=1.20.0" >> $GITHUB_OUTPUT
-          elif [[ "$MAJOR" -eq 1 && "$MINOR" -eq 9 ]]; then
-            echo "go_version=1.18.5" >> $GITHUB_OUTPUT
-          else
-            # Default for older versions
-            echo "go_version=1.20.0" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
-      - name: Update Go version if needed
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ steps.parse-version.outputs.go_version }}
-          check-latest: true
-      
-      - name: Build sing-box for ${{ matrix.os }} with ${{ matrix.tag-set }} tags
-        env:
-          GOOS: ${{ matrix.os }}
-          GOARCH: amd64
-          TAGS: ${{ matrix.tags }}
-        run: |
-          # Convert comma-separated tags to space-separated for Go build
-          GO_TAGS=$(echo $TAGS | tr ',' ' ')
-          
-          # Build the binary
-          go build -v -tags "$GO_TAGS" -o ${{ matrix.output }}${{ matrix.ext }} ./cmd/sing-box
-      
-      - name: Rename output file
-        run: |
-          mv ${{ matrix.output }}${{ matrix.ext }} sing-box-${{ matrix.os }}-${{ matrix.tag-set }}${{ matrix.ext }}
-        
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sing-box-${{ matrix.os }}-${{ matrix.tag-set }}
-          path: sing-box-${{ matrix.os }}-${{ matrix.tag-set }}${{ matrix.ext }}
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ^1.23
+        cache: false
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          pattern: my-artifact-*
-          merge-multiple: true
-        
-      - name: Create release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.version }}-build
-          name: sing-box ${{ github.event.inputs.version }} Build
-          draft: false
-          prerelease: false
-          files: |
-            sing-box-linux-default/sing-box-linux-default
-            sing-box-linux-all/sing-box-linux-all
-            sing-box-windows-default/sing-box-windows-default.exe
-            sing-box-windows-all/sing-box-windows-all.exe
+    - name: git clone
+      run: |
+        git clone -b ${{ github.event.inputs.sing_version }} https://github.com/SagerNet/sing-box
+
+    - name: Build Linux with default tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.LINUX }}
+        go build -tags ${{ env.TAG_DEFAULT }} -v -o sing-box-linux -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Linux CGO with default tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.LINUX_CGO }}
+        go build -tags ${{ env.TAG_DEFAULT }}-v -o sing-box-linux-CGO -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Linux with all tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.LINUX }}
+        go build -tags ${{ env.TAG_ALL }} -v -o sing-box-linux-all -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Linux CGO with all tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.LINUX_CGO }}
+        go build -tags ${{ env.TAG_ALL }}-v -o sing-box-linux-CGO-all -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Windows with default tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.WINDOWS }}
+        go build -tags ${{ env.TAG_DEFAULT }} -v -o sing-box-windows.exe -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Windows CGO with default tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.WINDOWS_CGO }}
+        go build -tags ${{ env.TAG_DEFAULT }}-v -o sing-box-windows-CGO.exe -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Windows with all tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.WINDOWS }}
+        go build -tags ${{ env.TAG_ALL }} -v -o sing-box-windows-all.exe -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Build Windows CGO with all tag
+      run: |
+        cd sing-box
+        go env -w ${{ env.WINDOWS_CGO }}
+        go build -tags ${{ env.TAG_ALL }}-v -o sing-box-windows-CGO-all.exe -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version  }}' -s -w -buildid=" ./cmd/sing-box
+        cd ..
+
+    - name: Upload
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.event.inputs.sing_version }}-build
+        name: sing-box ${{ github.event.inputs.sing_version }} Build
+        draft: false
+        prerelease: false
+        files: |
+          sing-box-linux
+          sing-box-linux-CGO
+          sing-box-linux-all
+          sing-box-linux-CGO-all
+          sing-box-windows.exe
+          sing-box-windows-CGO.exe
+          sing-box-windows-all.exe
+          sing-box-windows-CGO-all.exe
