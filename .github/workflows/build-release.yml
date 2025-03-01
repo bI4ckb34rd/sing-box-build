@@ -33,10 +33,13 @@ jobs:
           cache: true
 
       - name: Clone sing-box
-        uses: actions/checkout@v4
-        with:
-          repository: SagerNet/sing-box
-          ref: ${{ github.event.inputs.sing_version }}
+        run: |
+          git clone -b ${{ github.event.inputs.sing_version }} https://github.com/SagerNet/sing-box
+          cd sing-box
+          ACTUAL_VERSION=$(git describe --tags --always)
+          echo "ACTUAL_VERSION=${ACTUAL_VERSION}" >> $GITHUB_ENV
+          echo "Using version: ${ACTUAL_VERSION}"
+          cd ..
 
       - name: Build sing-box ${{ matrix.os }} (CGO=${{ matrix.cgo }}) with ${{ matrix.tags }}
         run: >-
@@ -69,7 +72,7 @@ jobs:
           cat > release_notes.md << EOF
           # sing-box ${{ github.event.inputs.sing_version }} Build
 
-          Automated build of sing-box ${{ github.event.inputs.sing_version }}
+          Automated build of sing-box ${{ env.ACTUAL_VERSION }}
 
           ## Build variants
 
