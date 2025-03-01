@@ -37,7 +37,6 @@ jobs:
         with:
           repository: SagerNet/sing-box
           ref: ${{ github.event.inputs.sing_version }}
-          path: sing-box
 
       - name: Build sing-box ${{ matrix.os }} (CGO=${{ matrix.cgo }}) with ${{ matrix.tags }}
         run: >-
