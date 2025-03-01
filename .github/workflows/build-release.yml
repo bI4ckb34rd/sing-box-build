@@ -47,8 +47,6 @@ jobs:
           export GOARCH=amd64
           export GOAMD64=v1
           go build -tags ${{ env[matrix.tags] }} -v -o sing-box-${{ matrix.os }}${{ matrix.cgo == '1' && '-CGO' || '' }}${{ matrix.tags == 'TAG_ALL' && '-all' || '' }} -trimpath -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.sing_version }}' -s -w -buildid=" ./cmd/sing-box
-          ACTUAL_VERSION=$(go run ./cmd/internal/read_tag)
-          echo "ACTUAL_VERSION=${ACTUAL_VERSION}"
           cd ..
 
       - name: Upload Artifact
